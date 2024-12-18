@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #000;
+            color: #fff;
+        }
+        canvas {
+            border: 2px solid #fff;
+        }
+        .score {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="score">Score: <span id="score">0</span></div>
+    <canvas id="tetris" width="300" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('tetris');
+        const context = canvas.getContext('2d');
+        const rowCount = 20;
+        const columnCount = 10;
+        const squareSize = 30;
+        let board = Array.from({ length: rowCount }, () => Array(columnCount).fill(null));
+
+        const colors = ['#00F', '#0F0', '#F00', '#F80', '#00F0', '#F0F0', '#F0F', '#FF0'];
+
+        const tetrominoes = [
+            [[1, 1, 1, 1]],  // I
+            [[1, 1], [1, 1]], // O
+            [[0, 1, 0], [1, 1, 1]], // T
+            [[1, 0, 0], [1, 1, 1]], // L
+            [[0, 0, 1], [1, 1, 1]], // J
+            [[1, 1, 0], [0, 1, 1]], // S
+            [[0, 1, 1], [1, 1, 0]], // Z
+        ];
+
+        let currentTetromino = generateTetromino();
+        let position = { x: 4, y: 0 };
+        let score = 0;
+        let speed = 500; // Game speed in milliseconds
+        let gameInterval;
+        let lastTime = 0;
+
+        // Initialize game loop
+        function startGame() {
+            gameInterval = requestAnimationFrame(gameLoop); // Start the game loop using requestAnimationFrame
+        }
+
+        // Game loop to update the game state
+        function gameLoop(timestamp) {
+            const deltaTime = timestamp - lastTime;
+            if (deltaTime > speed) {
+                lastTime = timestamp;
+                drawBoard();
+                drawTetromino();
+                moveTetromino();
+            }
+            requestAnimationFrame(gameLoop); // Continue the loop
+        }
+
+        // Draw the game board
+        function drawBoard() {
+            context.fillStyle = '#000';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            for (let row = 0; row < rowCount; row++) {
+                for (let col = 0; col < columnCount; col++) {
+                    if (board[row][col]) {
+                        context.fillStyle = board[row][col];
+                        context.fillRect(col * squareSize, row * squareSize, squareSize, squareSize);
+                    }
+                }
+            }
+        }
+
+        // Draw the current tetromino
+        function drawTetromino() {
+            for (let row = 0; row < currentTetromino.shape.length; row++) {
+                for (let col = 0; col < currentTetromino.shape[row].length; col++) {
+                    if (currentTetromino.shape[row][col]) {
+                        context.fillStyle = colors[currentTetromino.colorIndex];
+                        context.fillRect((position.x + col) * squareSize, (position.y + row) * squareSize, squareSize, squareSize);
+                    }
+                }
+            }
+        }
+
+        // Generate a new random tetromino
+        function generateTetromino() {
+            const index = Math.floor(Math.random() * tetrominoes.length);
+            return {
+                shape: tetrominoes[index],
+                colorIndex: index,
+            };
+        }
+
+        // Move the tetromino down
+        function moveTetromino() {
+            position.y++;
+            if (isColliding()) {
+                position.y--;
+                placeTetromino();
+                currentTetromino = generateTetromino();
+                position = { x: 4, y: 0 };
+                if (isColliding()) {
+                    cancelAnimationFrame(gameInterval); // Game over if collision occurs at the top
+                    alert("Game Over!");
+                    resetGame();
+                }
+            }
+        }
+
+        // Check if the current tetromino is colliding with the board
+        function isColliding() {
+            for (let row = 0; row < currentTetromino.shape.length; row++) {
+                for (let col = 0; col < currentTetromino.shape[row].length; col++) {
+                    if (currentTetromino.shape[row][col]) {
+                        const newX = position.x + col;
+                        const newY = position.y + row;
+                        if (newY >= rowCount || newX < 0 || newX >= columnCount || board[newY][newX]) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Place the current tetromino on the board
+        function placeTetromino() {
+            for (let row = 0; row < currentTetromino.shape.length; row++) {
+                for (let col = 0; col < currentTetromino.shape[row].length; col++) {
+                    if (currentTetromino.shape[row][col]) {
+                        board[position.y + row][position.x + col] = colors[currentTetromino.colorIndex];
+                    }
+                }
+            }
+            score += 1; // Increase score by 1 for each piece placed
+            document.getElementById('score').textContent = score; // Update score on screen
+            clearFullLines();
+        }
+
+        // Check and clear full lines, update score
+        function clearFullLines() {
+            for (let row = rowCount - 1; row >= 0; row--) {
+                if (board[row].every(cell => cell !== null)) {
+                    board.splice(row, 1);
+                    board.unshift(Array(columnCount).fill(null));
+                    increaseSpeed(); // Increase speed after clearing a line
+                }
+            }
+        }
+
+        // Increase the speed of the game as the player clears lines
+        function increaseSpeed() {
+            if (speed > 100) {
+                speed -= 50; // Increase speed every time a line is cleared
+            }
+        }
+
+        // Reset the game when it ends
+        function resetGame() {
+            board = Array.from({ length: rowCount }, () => Array(columnCount).fill(null));
+            score = 0;
+            document.getElementById('score').textContent = score;
+            speed = 500;
+            currentTetromino = generateTetromino();
+            position = { x: 4, y: 0 };
+            startGame(); // Restart the game
+        }
+
+        // Handle key presses for moving and rotating the tetromino
+        function handleKeyPress(event) {
+            switch (event.key) {
+                case 'ArrowLeft':
+                    position.x--;
+                    if (isColliding()) position.x++;
+                    break;
+                case 'ArrowRight':
+                    position.x++;
+                    if (isColliding()) position.x--;
+                    break;
+                case 'ArrowDown':
+                    moveTetromino(); // Move down immediately when the arrow is pressed
+                    break;
+                case 'ArrowUp':
+                    rotateTetromino();
+                    break;
+            }
+        }
+
+        // Rotate the tetromino
+        function rotateTetromino() {
+            const rotatedShape = currentTetromino.shape[0].map((_, index) =>
+                currentTetromino.shape.map(row => row[index])
+            );
+            const originalShape = currentTetromino.shape;
+            currentTetromino.shape = rotatedShape;
+            if (isColliding()) {
+                currentTetromino.shape = originalShape;
+            }
+        }
+
+        // Start the game and set up event listeners
+        document.addEventListener('keydown', handleKeyPress);
+        startGame(); // Start the game loop
+
+    </script>
+</body>
+</html>
